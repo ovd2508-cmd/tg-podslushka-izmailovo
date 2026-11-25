@@ -7,11 +7,10 @@ import urllib.parse
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Body
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 
 import db
 from config import BOT_TOKEN, MINI_APP_URL
@@ -99,15 +98,6 @@ def parse_init_data_user(init_data: str) -> Optional[dict]:
         return None
 
 
-# ---------- Модели ----------
-
-
-class ProfileSaveRequest(BaseModel):
-    init_data: str
-    display_name: Optional[str] = None
-    is_anonymous: bool = False
-
-
 # ---------- Эндпоинты ----------
 
 
@@ -119,12 +109,16 @@ async def get_leaderboard(limit: int = Query(10, ge=1, le=50)):
 
 
 @app.post("/api/profile/save")
-async def save_profile(request: ProfileSaveRequest):
-    """Сохраняет выбор пользователя (никнейм / анонимность)."""
-    if not validate_init_data(request.init_data, BOT_TOKEN):
+async def save_profile(data: dict = Body(...)):
+    """
+    Сохраняет выбор пользователя (никнейм / анонимность).
+    Требует валидный initData для идентификации пользователя.
+    """
+    init_data = data.get("init_data", "")
+    if not validate_init_data(init_data, BOT_TOKEN):
         raise HTTPException(status_code=401, detail="Invalid initData")
 
-    user = parse_init_data_user(request.init_data)
+    user = parse_init_data_user(init_data)
     if not user:
         raise HTTPException(status_code=400, detail="Cannot extract user from initData")
 
@@ -132,10 +126,13 @@ async def save_profile(request: ProfileSaveRequest):
     if not user_id:
         raise HTTPException(status_code=400, detail="User ID not found in initData")
 
+    display_name = data.get("display_name")
+    is_anonymous = data.get("is_anonymous", False)
+
     await db.save_user_profile(
         user_id=user_id,
-        display_name=request.display_name,
-        is_anonymous=request.is_anonymous,
+        display_name=display_name,
+        is_anonymous=is_anonymous,
     )
 
     return {"status": "saved", "user_id": user_id}
