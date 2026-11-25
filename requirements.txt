@@ -4,4 +4,3 @@ aiosqlite
 fastapi==0.115.0
 uvicorn==0.30.6
 aiohttp>=3.9.0
-pydantic>=2.0,<2.5
